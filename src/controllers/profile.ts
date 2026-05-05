@@ -49,11 +49,26 @@ export const createProfileController = () => {
           });
         }
 
+        const connectedUser = isExist.sock?.user as
+          | {
+              id?: string;
+              name?: string;
+              pushName?: string;
+            }
+          | undefined;
+
         return c.json({
-          data: await whatsapp.getProfile({
-            sessionId: payload.session,
-            target: payload.target,
-          }),
+          data: {
+            ...(await whatsapp.getProfile({
+              sessionId: payload.session,
+              target: payload.target,
+            })),
+            phoneNumber: connectedUser?.id?.split(":")[0] || "",
+            pushname:
+              connectedUser?.pushName ||
+              connectedUser?.name ||
+              "No Name",
+          },
         });
       }
     );

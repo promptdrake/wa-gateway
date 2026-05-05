@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
+import { bearerAuthMiddleware } from "../middlewares/key.middleware";
 import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
-import { whatsapp } from "../whatsapp";
+import { whatsapp, whatsappStatuses } from "../whatsapp";
+import { env } from "../env";
 
 export const createMessageController = () => {
   const sendMessageSchema = z.object({
@@ -15,6 +16,7 @@ export const createMessageController = () => {
 
   const app = new Hono()
     .basePath("/message")
+    .use("/*", bearerAuthMiddleware(env.KEY))
     /**
      *
      * POST /message/send-text
@@ -22,14 +24,14 @@ export const createMessageController = () => {
      */
     .post(
       "/send-text",
-      createKeyMiddleware(),
       requestValidator("json", sendMessageSchema),
       async (c) => {
         const payload = c.req.valid("json");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 
@@ -61,14 +63,14 @@ export const createMessageController = () => {
      */
     .get(
       "/send-text",
-      createKeyMiddleware(),
       requestValidator("query", sendMessageSchema),
       async (c) => {
         const payload = c.req.valid("query");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 
@@ -90,7 +92,6 @@ export const createMessageController = () => {
      */
     .post(
       "/send-image",
-      createKeyMiddleware(),
       requestValidator(
         "json",
         sendMessageSchema.merge(
@@ -103,8 +104,9 @@ export const createMessageController = () => {
         const payload = c.req.valid("json");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 
@@ -135,7 +137,6 @@ export const createMessageController = () => {
      */
     .post(
       "/send-document",
-      createKeyMiddleware(),
       requestValidator(
         "json",
         sendMessageSchema.merge(
@@ -149,8 +150,9 @@ export const createMessageController = () => {
         const payload = c.req.valid("json");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 
@@ -182,7 +184,6 @@ export const createMessageController = () => {
      */
     .post(
       "/send-video",
-      createKeyMiddleware(),
       requestValidator(
         "json",
         z.object({
@@ -197,8 +198,9 @@ export const createMessageController = () => {
         const payload = c.req.valid("json");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 
@@ -229,7 +231,6 @@ export const createMessageController = () => {
      */
     .post(
       "/send-sticker",
-      createKeyMiddleware(),
       requestValidator(
         "json",
         sendMessageSchema.merge(
@@ -242,8 +243,9 @@ export const createMessageController = () => {
         const payload = c.req.valid("json");
         const isExist = await whatsapp.getSessionById(payload.session);
         if (!isExist) {
+          whatsappStatuses.delete(payload.session);
           throw new HTTPException(400, {
-            message: "Session does not exist",
+            message: "Session is logged out",
           });
         }
 

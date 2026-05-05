@@ -1,0 +1,818 @@
+openapi: 3.0.0
+info:
+  title: WhatsApp Gateway API
+  description: WhatsApp Gateway API with Bearer Token Authentication
+  version: 4.6.3
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5001
+    description: Development server
+  - url: https://matsuzaki.aisbirnusantara.com
+    description: Production server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        status:
+          type: string
+          enum: [connected, connecting, disconnected]
+          example: "connected"
+        details:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "John Doe"
+            phoneNumber:
+              type: string
+              example: "1234567890"
+        connection:
+          type: object
+          properties:
+            isConnected:
+              type: boolean
+            lastUpdate:
+              type: string
+              format: date-time
+        metadata:
+          type: object
+          properties:
+            platform:
+              type: string
+            deviceManufacturer:
+              type: string
+            deviceModel:
+              type: string
+
+    SessionList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+
+    SessionStatus:
+      type: object
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        status:
+          type: string
+          enum: [connected, connecting, disconnected, logout]
+          example: "connected"
+
+    StartSessionRequest:
+      type: object
+      required:
+        - session
+      properties:
+        session:
+          type: string
+          example: "my-session"
+
+    StartSessionResponse:
+      type: object
+      properties:
+        qr:
+          type: string
+          description: QR code as base64 data URL
+          example: "data:image/png;base64,..."
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Connected"
+
+    LogoutResponse:
+      type: object
+      properties:
+        data:
+          type: string
+          example: "success"
+
+    DeleteSessionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          example: "Session 'session-name' deleted successfully"
+        data:
+          type: object
+          properties:
+            session:
+              type: string
+            deletedAt:
+              type: string
+              format: date-time
+
+    SendTextRequest:
+      type: object
+      required:
+        - session
+        - to
+        - text
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        to:
+          type: string
+          description: Target WhatsApp ID
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          example: "Hello World"
+        is_group:
+          type: boolean
+          default: false
+
+    SendImageRequest:
+      type: object
+      required:
+        - session
+        - to
+        - text
+        - image_url
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        to:
+          type: string
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          example: "Image caption"
+        image_url:
+          type: string
+          format: uri
+          example: "https://example.com/image.jpg"
+        is_group:
+          type: boolean
+          default: false
+
+    SendDocumentRequest:
+      type: object
+      required:
+        - session
+        - to
+        - text
+        - document_url
+        - document_name
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        to:
+          type: string
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          example: "Document caption"
+        document_url:
+          type: string
+          format: uri
+          example: "https://example.com/file.pdf"
+        document_name:
+          type: string
+          example: "file.pdf"
+        is_group:
+          type: boolean
+          default: false
+
+    SendVideoRequest:
+      type: object
+      required:
+        - session
+        - to
+        - video_url
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        to:
+          type: string
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          example: "Video caption"
+        video_url:
+          type: string
+          format: uri
+          example: "https://example.com/video.mp4"
+        is_group:
+          type: boolean
+          default: false
+
+    SendStickerRequest:
+      type: object
+      required:
+        - session
+        - to
+        - image_url
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        to:
+          type: string
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          example: "Sticker"
+        image_url:
+          type: string
+          format: uri
+          example: "https://example.com/sticker.webp"
+        is_group:
+          type: boolean
+          default: false
+
+    GetProfileRequest:
+      type: object
+      required:
+        - session
+        - target
+      properties:
+        session:
+          type: string
+          example: "session-name"
+        target:
+          type: string
+          description: Must contain @s.whatsapp.net or @g.us
+          example: "1234567890@s.whatsapp.net"
+
+    MessageResponse:
+      type: object
+      properties:
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        error:
+          type: string
+
+    GetSessionStatusRequest:
+      type: object
+      required:
+        - session_name
+      properties:
+        session_name:
+          type: string
+          example: "session-name"
+
+    LogoutRequest:
+      type: object
+      required:
+        - session
+      properties:
+        session:
+          type: string
+          example: "session-name"
+
+security:
+  - BearerAuth: []
+
+paths:
+  /session:
+    get:
+      tags:
+        - Session
+      summary: Get all sessions
+      description: Retrieve a list of all active sessions with their status
+      operationId: getAllSessions
+      responses:
+        '200':
+          description: List of sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '401':
+          description: Unauthorized - Invalid or missing Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /session/{session}:
+    get:
+      tags:
+        - Session
+      summary: Get session details
+      description: Retrieve detailed information about a specific session
+      operationId: getSessionDetail
+      parameters:
+        - name: session
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "session-name"
+      responses:
+        '200':
+          description: Session details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Session
+      summary: Delete a session
+      description: Delete a session and remove it from the database
+      operationId: deleteSession
+      parameters:
+        - name: session
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "session-name"
+      responses:
+        '200':
+          description: Session deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteSessionResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /session/start:
+    post:
+      tags:
+        - Session
+      summary: Start a new session
+      description: Initialize a new WhatsApp session and get QR code for scanning
+      operationId: startSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSessionRequest'
+      responses:
+        '200':
+          description: Session started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartSessionResponse'
+        '400':
+          description: Session already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Session
+      summary: Start a new session (GET)
+      description: Initialize a new WhatsApp session and render QR code as HTML
+      operationId: startSessionGet
+      parameters:
+        - name: session
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "session-name"
+      responses:
+        '200':
+          description: QR code rendered as HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Session already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /session/logout:
+    get:
+      tags:
+        - Session
+      summary: Logout a session (GET)
+      description: Logout a session and notify webhook
+      operationId: logoutSessionGet
+      parameters:
+        - name: session
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "session-name"
+      responses:
+        '200':
+          description: Session logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '400':
+          description: Missing session parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Session
+      summary: Logout a session (POST)
+      description: Logout a session and notify webhook
+      operationId: logoutSessionPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Session logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '400':
+          description: Missing session parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /session/getsession:
+    post:
+      tags:
+        - Session
+      summary: Get session status
+      description: Get the status of a session by session name
+      operationId: getSessionStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetSessionStatusRequest'
+      responses:
+        '200':
+          description: Session status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatus'
+        '400':
+          description: Missing session_name parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /message/send-text:
+    post:
+      tags:
+        - Message
+      summary: Send text message
+      description: Send a text message to a WhatsApp contact
+      operationId: sendText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTextRequest'
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Message
+      summary: Send text message (GET - Deprecated)
+      description: Send a text message via GET request (deprecated, use POST)
+      operationId: sendTextGet
+      parameters:
+        - name: session
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: text
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: is_group
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /message/send-image:
+    post:
+      tags:
+        - Message
+      summary: Send image message
+      description: Send an image message to a WhatsApp contact
+      operationId: sendImage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendImageRequest'
+      responses:
+        '200':
+          description: Image sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /message/send-document:
+    post:
+      tags:
+        - Message
+      summary: Send document message
+      description: Send a document/file message to a WhatsApp contact
+      operationId: sendDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendDocumentRequest'
+      responses:
+        '200':
+          description: Document sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /message/send-video:
+    post:
+      tags:
+        - Message
+      summary: Send video message
+      description: Send a video message to a WhatsApp contact
+      operationId: sendVideo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendVideoRequest'
+      responses:
+        '200':
+          description: Video sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /message/send-sticker:
+    post:
+      tags:
+        - Message
+      summary: Send sticker message
+      description: Send a sticker message to a WhatsApp contact
+      operationId: sendSticker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendStickerRequest'
+      responses:
+        '200':
+          description: Sticker sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Session is logged out or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /profile:
+    post:
+      tags:
+        - Profile
+      summary: Get profile information
+      description: Get WhatsApp profile information for a contact
+      operationId: getProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetProfileRequest'
+      responses:
+        '200':
+          description: Profile information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Session does not exist or target is not registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the API is running
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"

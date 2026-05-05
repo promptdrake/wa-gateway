@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
+import { bearerAuthMiddleware } from "../middlewares/key.middleware";
 import { toDataURL } from "qrcode";
 import { HTTPException } from "hono/http-exception";
 import { whatsapp, whatsappStatuses } from "../whatsapp";
-
+import { env } from "../env";
 export const createSessionController = () => {
   const startSessionSchema = z.object({
     session: z.string(),
@@ -13,13 +13,14 @@ export const createSessionController = () => {
 
   const app = new Hono()
     .basePath("/session")
+    .use("/*", bearerAuthMiddleware(env.KEY))
 
     /**
      *
      * GET /session
      *
      */
-    .get("/", createKeyMiddleware(), async (c) => {
+    .get("/", async (c) => {
       return c.json({
         data: Array.from(whatsappStatuses.entries()).map(
           ([session, status]) => ({
@@ -36,7 +37,7 @@ export const createSessionController = () => {
      * Mendapatkan detail session berdasarkan session ID
      *
      */
-    .get("/:session", createKeyMiddleware(), async (c) => {
+    .get("/:session", async (c) => {
       const sessionId = c.req.param("session");
 
       if (!sessionId) {
@@ -89,7 +90,6 @@ export const createSessionController = () => {
      */
     .post(
       "/start",
-      createKeyMiddleware(),
       requestValidator("json", startSessionSchema),
       async (c) => {
         const payload = c.req.valid("json");
@@ -133,7 +133,6 @@ export const createSessionController = () => {
      */
     .get(
       "/start",
-      createKeyMiddleware(),
       requestValidator("query", startSessionSchema),
       async (c) => {
         const payload = c.req.valid("query");
@@ -178,16 +177,43 @@ export const createSessionController = () => {
     )
     /**
      *
-     * ALL /session/logout
+     * GET/POST /session/logout?session=SESSION_NAME
      *
      */
-    .all("/logout", createKeyMiddleware(), async (c) => {
-      await whatsapp.deleteSession(
-        c.req.query().session || (await c.req.json()).session || ""
-      );
-      return c.json({
-        data: "success",
-      });
+    .all("/logout", async (c) => {
+      let sessionName = c.req.query().session;
+      if (!sessionName && c.req.header("content-type")?.includes("application/json")) {
+        const body = await c.req.json().catch(() => ({}));
+        sessionName = body.session;
+      }
+      if (!sessionName) {
+        throw new HTTPException(400, { message: "Session name required" });
+      }
+      await whatsapp.deleteSession(sessionName);
+      whatsappStatuses.delete(sessionName);
+      // Notify webhook
+      try {
+        const { createWebhookSession } = await import("../webhooks/session");
+        const webhookSession = createWebhookSession({ baseUrl: env.WEBHOOK_BASE_URL });
+        webhookSession({ session: sessionName, status: "disconnected" });
+      } catch {}
+      return c.json({ data: "success" });
+    })
+
+    /**
+     *
+     * POST /session/getsession
+     * Get session status by session name
+     *
+     */
+    .post("/getsession", async (c) => {
+      const { session_name } = await c.req.json().catch(() => ({}));
+      if (!session_name) {
+        throw new HTTPException(400, { message: "session_name required" });
+      }
+      const statusInfo = whatsappStatuses.get(session_name);
+      const status = statusInfo?.status || "logout";
+      return c.json({ session: session_name, status });
     })
 
     /**
@@ -196,7 +222,7 @@ export const createSessionController = () => {
      * Menghapus session berdasarkan session ID
      *
      */
-    .delete("/:session", createKeyMiddleware(), async (c) => {
+    .delete("/:session", async (c) => {
       const sessionId = c.req.param("session");
 
       if (!sessionId) {

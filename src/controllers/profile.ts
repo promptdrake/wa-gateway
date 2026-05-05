@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
+import { bearerAuthMiddleware } from "../middlewares/key.middleware";
 import { HTTPException } from "hono/http-exception";
 import { whatsapp } from "../whatsapp";
+import { env } from "../env";
 
 export const createProfileController = () => {
   const getProfileSchema = z.object({
@@ -17,6 +18,7 @@ export const createProfileController = () => {
 
   const app = new Hono()
     .basePath("/profile")
+    .use("/*", bearerAuthMiddleware(env.KEY))
 
     /**
      *
@@ -25,7 +27,6 @@ export const createProfileController = () => {
      */
     .post(
       "/",
-      createKeyMiddleware(),
       requestValidator("json", getProfileSchema),
       async (c) => {
         const payload = c.req.valid("json");

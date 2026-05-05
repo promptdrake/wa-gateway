@@ -29,8 +29,10 @@
     "moment": "^2.29.4",
     "morgan": "~1.9.1",
     "qrcode": "^1.5.1",
+    "swagger-ui-express": "^5.0.1",
     "tsx": "^4.19.2",
     "wa-multi-session": "^4.2.3",
+    "yaml": "^2.8.4",
     "zod": "^3.23.8"
   },
   "repository": {
